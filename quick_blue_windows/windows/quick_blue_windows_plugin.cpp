@@ -377,31 +377,36 @@ std::unique_ptr<flutter::StreamHandlerError<EncodableValue>> QuickBlueWindowsPlu
 }
 
 winrt::fire_and_forget QuickBlueWindowsPlugin::DiscoverServicesAsync(uint64_t bluetoothAddress) {
-    auto device = co_await BluetoothLEDevice::FromBluetoothAddressAsync(bluetoothAddress);
-    if(!device) {
-        co_return;
-    }
-    auto servicesResult = co_await device.GetGattServicesAsync();
+    try {
+        auto device = co_await
+        BluetoothLEDevice::FromBluetoothAddressAsync(bluetoothAddress);
+        if (!device) {
+            co_return;
+        }
+        auto servicesResult = co_await
+        device.GetGattServicesAsync();
 
-    if(servicesResult.Status() == GattCommunicationStatus::Success) {
-        for (auto service : servicesResult.Services()) {
-            auto characteristicResult = co_await service.GetCharacteristicsAsync();
-            EncodableList encodableChars;
-            if(characteristicResult.Status() == GattCommunicationStatus::Success) {
-                for(auto characteristic : characteristicResult.Characteristics()) {
-                    encodableChars.push_back(to_uuidstr(characteristic.Uuid()));
+        if (servicesResult.Status() == GattCommunicationStatus::Success) {
+            for (auto service: servicesResult.Services()) {
+                auto characteristicResult = co_await
+                service.GetCharacteristicsAsync();
+                EncodableList encodableChars;
+                if (characteristicResult.Status() == GattCommunicationStatus::Success) {
+                    for (auto characteristic: characteristicResult.Characteristics()) {
+                        encodableChars.push_back(to_uuidstr(characteristic.Uuid()));
+                    }
                 }
+
+                message_connector_->Send(EncodableMap{
+                        {"deviceId",        std::to_string(bluetoothAddress)},
+                        {"service",         to_uuidstr(service.Uuid())},
+                        {"characteristics", encodableChars},
+                        {"ServiceState",    "discovered"},
+                });
             }
-
-            message_connector_->Send(EncodableMap{
-                    {"deviceId", std::to_string(bluetoothAddress)},
-                    {"service", to_uuidstr(service.Uuid())},
-                    {"characteristics", encodableChars},
-                    {"ServiceState", "discovered"},
-            });
-    }
-
-
+        }
+    } catch(...) {
+        // Don't care at the moment.
     }
 }
 
