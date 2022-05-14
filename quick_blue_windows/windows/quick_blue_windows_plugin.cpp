@@ -380,13 +380,25 @@ winrt::fire_and_forget QuickBlueWindowsPlugin::DiscoverServicesAsync(uint64_t bl
     auto device = co_await BluetoothLEDevice::FromBluetoothAddressAsync(bluetoothAddress);
     auto servicesResult = co_await device.GetGattServicesAsync();
 
-    for (auto service : servicesResult.Services()) {
-        message_connector_->Send(EncodableMap{
-                {"deviceId", std::to_string(bluetoothAddress)},
-                {"service", to_uuidstr(service.Uuid())},
-                {"characteristics", EncodableList()},
-                {"ServiceState", "discovered"},
-        });
+    if((int)servicesResult.Status() == 0) {
+        for (auto service : servicesResult.Services()) {
+            auto characteristicResult = co_await service.GetCharacteristicsAsync();
+            EncodableList encodableChars;
+            if((int)characteristicResult.Status() == 0) {
+                for(auto characteristic : characteristicResult.Characteristics()) {
+                    encodableChars.push_back(to_uuidstr(characteristic.Uuid()));
+                }
+            }
+
+            message_connector_->Send(EncodableMap{
+                    {"deviceId", std::to_string(bluetoothAddress)},
+                    {"service", to_uuidstr(service.Uuid())},
+                    {"characteristics", encodableChars},
+                    {"ServiceState", "discovered"},
+            });
+    }
+
+
     }
 }
 
