@@ -376,7 +376,13 @@ std::unique_ptr<flutter::StreamHandlerError<EncodableValue>> QuickBlueWindowsPlu
   return nullptr;
 }
 
+// This method is not strictly necessary. You could connect to a device and start working with it.
+// For real applications that is generally not practical. You at least need to know the services from adveritsement.
+// I think a better approach would be to refactor the signature of the scan discovery to include advertised UUIDs.
+// They are available on all the supported platforms.
 winrt::fire_and_forget QuickBlueWindowsPlugin::DiscoverServicesAsync(uint64_t bluetoothAddress) {
+    // All the GetGattXAsync methods can throw exceptions. For now just wrap this whole method.
+    // Need a more robust error handling mechanism as there are many such called.
     try {
         auto device = co_await
         BluetoothLEDevice::FromBluetoothAddressAsync(bluetoothAddress);
