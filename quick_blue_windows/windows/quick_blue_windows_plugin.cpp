@@ -378,13 +378,16 @@ std::unique_ptr<flutter::StreamHandlerError<EncodableValue>> QuickBlueWindowsPlu
 
 winrt::fire_and_forget QuickBlueWindowsPlugin::DiscoverServicesAsync(uint64_t bluetoothAddress) {
     auto device = co_await BluetoothLEDevice::FromBluetoothAddressAsync(bluetoothAddress);
+    if(!device) {
+        co_return;
+    }
     auto servicesResult = co_await device.GetGattServicesAsync();
 
-    if((int)servicesResult.Status() == 0) {
+    if(servicesResult.Status() == GattCommunicationStatus::Success) {
         for (auto service : servicesResult.Services()) {
             auto characteristicResult = co_await service.GetCharacteristicsAsync();
             EncodableList encodableChars;
-            if((int)characteristicResult.Status() == 0) {
+            if(characteristicResult.Status() == GattCommunicationStatus::Success) {
                 for(auto characteristic : characteristicResult.Characteristics()) {
                     encodableChars.push_back(to_uuidstr(characteristic.Uuid()));
                 }
@@ -404,6 +407,9 @@ winrt::fire_and_forget QuickBlueWindowsPlugin::DiscoverServicesAsync(uint64_t bl
 
 winrt::fire_and_forget QuickBlueWindowsPlugin::ConnectAsync(uint64_t bluetoothAddress) {
   auto device = co_await BluetoothLEDevice::FromBluetoothAddressAsync(bluetoothAddress);
+  if(!device) {
+      co_return;
+  }
   auto servicesResult = co_await device.GetGattServicesAsync();
   if (servicesResult.Status() != GattCommunicationStatus::Success) {
     OutputDebugString((L"GetGattServicesAsync error: " + winrt::to_hstring((int32_t)servicesResult.Status()) + L"\n").c_str());
