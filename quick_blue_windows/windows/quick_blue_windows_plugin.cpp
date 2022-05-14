@@ -89,28 +89,46 @@ struct BluetoothDeviceAgent {
 
   IAsyncOperation<GattDeviceService> GetServiceAsync(std::string service) {
     if (gattServices.count(service) == 0) {
-      auto serviceResult = co_await device.GetGattServicesAsync();
-      if (serviceResult.Status() != GattCommunicationStatus::Success)
-        co_return nullptr;
+        try {
+            auto serviceResult = co_await
+            device.GetGattServicesAsync();
 
-      for (auto s : serviceResult.Services())
-        if (to_uuidstr(s.Uuid()) == service)
-          gattServices.insert(std::make_pair(service, s));
+            if (serviceResult.Status() != GattCommunicationStatus::Success)
+                co_return nullptr;
+
+            for (auto s : serviceResult.Services())
+                if (to_uuidstr(s.Uuid()) == service)
+                    gattServices.insert(std::make_pair(service, s));
+        } catch (...) {
+            co_return nullptr;
+        }
     }
     co_return gattServices.at(service);
   }
 
   IAsyncOperation<GattCharacteristic> GetCharacteristicAsync(std::string service, std::string characteristic) {
     if (gattCharacteristics.count(characteristic) == 0) {
-      auto gattService = co_await GetServiceAsync(service);
+        try {
+            auto gattService = co_await
+            GetServiceAsync(service);
 
-      auto characteristicResult = co_await gattService.GetCharacteristicsAsync();
-      if (characteristicResult.Status() != GattCommunicationStatus::Success)
-        co_return nullptr;
+            try {
+                auto characteristicResult = co_await
+                gattService.GetCharacteristicsAsync();
 
-      for (auto c : characteristicResult.Characteristics())
-        if (to_uuidstr(c.Uuid()) == characteristic)
-          gattCharacteristics.insert(std::make_pair(characteristic, c));
+                if (characteristicResult.Status() != GattCommunicationStatus::Success)
+                    co_return nullptr;
+
+                for (auto c : characteristicResult.Characteristics())
+                    if (to_uuidstr(c.Uuid()) == characteristic)
+                        gattCharacteristics.insert(std::make_pair(characteristic, c));
+            } catch(...) {
+                co_return nullptr;
+            }
+
+        } catch(...) {
+            co_return nullptr;
+        }
     }
     co_return gattCharacteristics.at(characteristic);
   }
@@ -421,24 +439,39 @@ winrt::fire_and_forget QuickBlueWindowsPlugin::ConnectAsync(uint64_t bluetoothAd
   if(!device) {
       co_return;
   }
-  auto servicesResult = co_await device.GetGattServicesAsync();
-  if (servicesResult.Status() != GattCommunicationStatus::Success) {
-    OutputDebugString((L"GetGattServicesAsync error: " + winrt::to_hstring((int32_t)servicesResult.Status()) + L"\n").c_str());
-    message_connector_->Send(EncodableMap{
-      {"deviceId", std::to_string(bluetoothAddress)},
-      {"ConnectionState", "disconnected"},
-    });
-    co_return;
-  }
-  auto connnectionStatusChangedToken = device.ConnectionStatusChanged({ this, &QuickBlueWindowsPlugin::BluetoothLEDevice_ConnectionStatusChanged });
-  auto deviceAgent = std::make_unique<BluetoothDeviceAgent>(device, connnectionStatusChangedToken);
-  auto pair = std::make_pair(bluetoothAddress, std::move(deviceAgent));
-  connectedDevices.insert(std::move(pair));
 
-  message_connector_->Send(EncodableMap{
-    {"deviceId", std::to_string(bluetoothAddress)},
-    {"ConnectionState", "connected"},
-  });
+  try {
+      auto servicesResult = co_await
+      device.GetGattServicesAsync();
+
+      if (servicesResult.Status() != GattCommunicationStatus::Success) {
+          OutputDebugString((L"GetGattServicesAsync error: " + winrt::to_hstring((int32_t)servicesResult.Status()) + L"\n").c_str());
+          message_connector_->Send(EncodableMap{
+                  {"deviceId", std::to_string(bluetoothAddress)},
+                  {"ConnectionState", "disconnected"},
+          });
+          co_return;
+      }
+      auto connnectionStatusChangedToken = device.ConnectionStatusChanged({ this, &QuickBlueWindowsPlugin::BluetoothLEDevice_ConnectionStatusChanged });
+      auto deviceAgent = std::make_unique<BluetoothDeviceAgent>(device, connnectionStatusChangedToken);
+      auto pair = std::make_pair(bluetoothAddress, std::move(deviceAgent));
+      connectedDevices.insert(std::move(pair));
+
+      message_connector_->Send(EncodableMap{
+              {"deviceId", std::to_string(bluetoothAddress)},
+              {"ConnectionState", "connected"},
+      });
+
+  } catch(...) {
+      // TODO: De-duplicate this with status condition.
+      OutputDebugString(L"GetGattServicesAsync error: Exception getting services.\n");
+      message_connector_->Send(EncodableMap{
+              {"deviceId", std::to_string(bluetoothAddress)},
+              {"ConnectionState", "disconnected"},
+      });
+      co_return;
+  }
+
 }
 
 void QuickBlueWindowsPlugin::BluetoothLEDevice_ConnectionStatusChanged(BluetoothLEDevice sender, IInspectable args) {
