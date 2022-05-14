@@ -38,6 +38,7 @@ using namespace winrt::Windows::Devices::Bluetooth::Advertisement;
 using namespace winrt::Windows::Devices::Bluetooth::GenericAttributeProfile;
 
 using flutter::EncodableValue;
+using flutter::EncodableList;
 using flutter::EncodableMap;
 
 union uint16_t_union {
@@ -151,6 +152,7 @@ class QuickBlueWindowsPlugin : public flutter::Plugin, public flutter::StreamHan
   std::map<uint64_t, std::unique_ptr<BluetoothDeviceAgent>> connectedDevices{};
 
   winrt::fire_and_forget ConnectAsync(uint64_t bluetoothAddress);
+  winrt::fire_and_forget DiscoverServicesAsync(uint64_t bluetoothAddress);
   void BluetoothLEDevice_ConnectionStatusChanged(BluetoothLEDevice sender, IInspectable args);
   void CleanConnection(uint64_t bluetoothAddress);
 
@@ -247,8 +249,10 @@ void QuickBlueWindowsPlugin::HandleMethodCall(
     // TODO send `disconnected` message
     result->Success(nullptr);
   } else if (method_name.compare("discoverServices") == 0) {
-    // FIXME Unnecessary for Windows: https://github.com/woodemi/quick_blue/issues/76
-    result->NotImplemented();
+      auto args = std::get<EncodableMap>(*method_call.arguments());
+      auto deviceId = std::get<std::string>(args[EncodableValue("deviceId")]);
+      DiscoverServicesAsync(std::stoull(deviceId));
+      result->Success(nullptr);
   } else if (method_name.compare("setNotifiable") == 0) {
     auto args = std::get<EncodableMap>(*method_call.arguments());
     auto deviceId = std::get<std::string>(args[EncodableValue("deviceId")]);
@@ -372,8 +376,51 @@ std::unique_ptr<flutter::StreamHandlerError<EncodableValue>> QuickBlueWindowsPlu
   return nullptr;
 }
 
+// This method is not strictly necessary. You could connect to a device and start working with it.
+// For real applications that is generally not practical. You at least need to know the services from adveritsement.
+// I think a better approach would be to refactor the signature of the scan discovery to include advertised UUIDs.
+// They are available on all the supported platforms.
+winrt::fire_and_forget QuickBlueWindowsPlugin::DiscoverServicesAsync(uint64_t bluetoothAddress) {
+    // All the GetGattXAsync methods can throw exceptions. For now just wrap this whole method.
+    // Need a more robust error handling mechanism as there are many such called.
+    try {
+        auto device = co_await
+        BluetoothLEDevice::FromBluetoothAddressAsync(bluetoothAddress);
+        if (!device) {
+            co_return;
+        }
+        auto servicesResult = co_await
+        device.GetGattServicesAsync();
+
+        if (servicesResult.Status() == GattCommunicationStatus::Success) {
+            for (auto service: servicesResult.Services()) {
+                auto characteristicResult = co_await
+                service.GetCharacteristicsAsync();
+                EncodableList encodableChars;
+                if (characteristicResult.Status() == GattCommunicationStatus::Success) {
+                    for (auto characteristic: characteristicResult.Characteristics()) {
+                        encodableChars.push_back(to_uuidstr(characteristic.Uuid()));
+                    }
+                }
+
+                message_connector_->Send(EncodableMap{
+                        {"deviceId",        std::to_string(bluetoothAddress)},
+                        {"service",         to_uuidstr(service.Uuid())},
+                        {"characteristics", encodableChars},
+                        {"ServiceState",    "discovered"},
+                });
+            }
+        }
+    } catch(...) {
+        // Don't care at the moment.
+    }
+}
+
 winrt::fire_and_forget QuickBlueWindowsPlugin::ConnectAsync(uint64_t bluetoothAddress) {
   auto device = co_await BluetoothLEDevice::FromBluetoothAddressAsync(bluetoothAddress);
+  if(!device) {
+      co_return;
+  }
   auto servicesResult = co_await device.GetGattServicesAsync();
   if (servicesResult.Status() != GattCommunicationStatus::Success) {
     OutputDebugString((L"GetGattServicesAsync error: " + winrt::to_hstring((int32_t)servicesResult.Status()) + L"\n").c_str());
