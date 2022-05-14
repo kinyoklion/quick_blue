@@ -517,6 +517,8 @@ winrt::fire_and_forget QuickBlueWindowsPlugin::SetNotifiableAsync(BluetoothDevic
         auto descriptorValue = bleInputProperty == "notification" ? GattClientCharacteristicConfigurationDescriptorValue::Notify
                                                                   : bleInputProperty == "indication" ? GattClientCharacteristicConfigurationDescriptorValue::Indicate
                                                                                                      : GattClientCharacteristicConfigurationDescriptorValue::None;
+        // TODO: This will throw an exception if the indication type is wrong. It may be better to add an abstraction that will
+        // indicate if available, otherwise notify. Or it needs to be easier to interrogate what it supports.
         auto writeDescriptorStatus = co_await gattCharacteristic.WriteClientCharacteristicConfigurationDescriptorAsync(descriptorValue);
         if (writeDescriptorStatus != GattCommunicationStatus::Success)
             OutputDebugString((L"WriteClientCharacteristicConfigurationDescriptorAsync " + winrt::to_hstring((int32_t)writeDescriptorStatus) + L"\n").c_str());
