@@ -74,14 +74,14 @@ std::string to_uuidstr(winrt::guid guid) {
 
 struct BluetoothDeviceAgent {
   BluetoothLEDevice device;
-  winrt::event_token connnectionStatusChangedToken;
+  winrt::event_token connectionStatusChangedToken;
   std::map<std::string, GattDeviceService> gattServices;
   std::map<std::string, GattCharacteristic> gattCharacteristics;
   std::map<std::string, winrt::event_token> valueChangedTokens;
 
-  BluetoothDeviceAgent(BluetoothLEDevice device, winrt::event_token connnectionStatusChangedToken)
+  BluetoothDeviceAgent(BluetoothLEDevice device, winrt::event_token connectionStatusChangedToken)
       : device(device),
-        connnectionStatusChangedToken(connnectionStatusChangedToken) {}
+        connectionStatusChangedToken(connectionStatusChangedToken) {}
 
   ~BluetoothDeviceAgent() {
     device = nullptr;
@@ -457,8 +457,8 @@ winrt::fire_and_forget QuickBlueWindowsPlugin::ConnectAsync(uint64_t bluetoothAd
           });
           co_return;
       }
-      auto connnectionStatusChangedToken = device.ConnectionStatusChanged({ this, &QuickBlueWindowsPlugin::BluetoothLEDevice_ConnectionStatusChanged });
-      auto deviceAgent = std::make_unique<BluetoothDeviceAgent>(device, connnectionStatusChangedToken);
+      auto connectionStatusChangedToken = device.ConnectionStatusChanged({ this, &QuickBlueWindowsPlugin::BluetoothLEDevice_ConnectionStatusChanged });
+      auto deviceAgent = std::make_unique<BluetoothDeviceAgent>(device, connectionStatusChangedToken);
       auto pair = std::make_pair(bluetoothAddress, std::move(deviceAgent));
       connectedDevices.insert(std::move(pair));
 
@@ -494,7 +494,7 @@ void QuickBlueWindowsPlugin::CleanConnection(uint64_t bluetoothAddress) {
   auto node = connectedDevices.extract(bluetoothAddress);
   if (!node.empty()) {
     auto deviceAgent = std::move(node.mapped());
-    deviceAgent->device.ConnectionStatusChanged(deviceAgent->connnectionStatusChangedToken);
+    deviceAgent->device.ConnectionStatusChanged(deviceAgent->connectionStatusChangedToken);
     for (auto& tokenPair : deviceAgent->valueChangedTokens) {
       deviceAgent->gattCharacteristics.at(tokenPair.first).ValueChanged(tokenPair.second);
     }
