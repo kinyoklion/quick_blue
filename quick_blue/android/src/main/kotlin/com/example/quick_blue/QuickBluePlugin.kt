@@ -171,11 +171,16 @@ class QuickBluePlugin: FlutterPlugin, MethodCallHandler, EventChannel.StreamHand
 
     override fun onScanResult(callbackType: Int, result: ScanResult) {
       Log.v(TAG, "onScanResult: $callbackType + $result")
+      if(result.getScanRecord() == null) {
+        result.device.fetchUuidsWithSdp();
+      }
+      val stringIds = result.getScanRecord()?.getServiceUuids()?.map { uuid -> uuid.toString() } ?: emptyList<String>()
       scanResultSink?.success(mapOf<String, Any>(
               "name" to (result.device.name ?: ""),
               "deviceId" to result.device.address,
               "manufacturerDataHead" to (result.manufacturerDataHead ?: byteArrayOf()),
-              "rssi" to result.rssi
+              "rssi" to result.rssi,
+              "uuids" to stringIds
       ))
     }
 
