@@ -244,6 +244,8 @@ void QuickBlueWindowsPlugin::HandleMethodCall(
   } else if (method_name.compare("startScan") == 0) {
     if (!bluetoothLEWatcher) {
       bluetoothLEWatcher = BluetoothLEAdvertisementWatcher();
+      bluetoothLEWatcher.ScanningMode(BluetoothLEScanningMode::Active);
+      bluetoothLEWatcher.AllowExtendedAdvertisements(true);
       bluetoothLEWatcherReceivedToken = bluetoothLEWatcher.Received({ this, &QuickBlueWindowsPlugin::BluetoothLEWatcher_Received });
     }
     bluetoothLEWatcher.Start();
@@ -357,12 +359,17 @@ winrt::fire_and_forget QuickBlueWindowsPlugin::SendScanResultAsync(BluetoothLEAd
         auto name = device ? device.Name() : args.Advertisement().LocalName();
         OutputDebugString((L"Received BluetoothAddress:" + winrt::to_hstring(args.BluetoothAddress())
             + L", Name:" + name + L", LocalName:" + args.Advertisement().LocalName() + L"\n").c_str());
+        EncodableList encodableServices;
+            for (auto serviceUuid: args.Advertisement().ServiceUuids()) {
+                encodableServices.push_back(to_uuidstr(serviceUuid));
+            }
         if (scan_result_sink_) {
             scan_result_sink_->Success(EncodableMap{
               {"name", winrt::to_string(name)},
               {"deviceId", std::to_string(args.BluetoothAddress())},
               {"manufacturerDataHead", parseManufacturerDataHead(args.Advertisement())},
               {"rssi", args.RawSignalStrengthInDBm()},
+              {"uuids", encodableServices}
                 });
         }
     }

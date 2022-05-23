@@ -8,6 +8,7 @@ class BlueScanResult {
   Uint8List? _manufacturerDataHead;
   Uint8List? _manufacturerData;
   int rssi;
+  List<String> uuids;
 
   Uint8List get manufacturerDataHead => _manufacturerDataHead ?? _empty;
 
@@ -18,7 +19,8 @@ class BlueScanResult {
         deviceId = map['deviceId'],
         _manufacturerDataHead = map['manufacturerDataHead'],
         _manufacturerData = map['manufacturerData'],
-        rssi = map['rssi'];
+        rssi = map['rssi'],
+        uuids = map['uuids']?.map<String>((item) => item.toString()).toList() ?? <String>[];
 
   Map toMap() => {
         'name': name,
@@ -26,5 +28,6 @@ class BlueScanResult {
         'manufacturerDataHead': _manufacturerDataHead,
         'manufacturerData': _manufacturerData,
         'rssi': rssi,
+        'uuids': uuids
       };
 }
