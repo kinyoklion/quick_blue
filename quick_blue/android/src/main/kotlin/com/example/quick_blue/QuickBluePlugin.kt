@@ -292,17 +292,26 @@ fun Short.toByteArray(byteOrder: ByteOrder = ByteOrder.LITTLE_ENDIAN): ByteArray
         ByteBuffer.allocate(2 /*Short.SIZE_BYTES*/).order(byteOrder).putShort(this).array()
 
 fun BluetoothGatt.getCharacteristic(serviceCharacteristic: Pair<String, String>) =
-        getService(UUID.fromString(serviceCharacteristic.first)).getCharacteristic(UUID.fromString(serviceCharacteristic.second))
+        getService(UUID.fromString(serviceCharacteristic.first))?.getCharacteristic(UUID.fromString(serviceCharacteristic.second))
 
 private val DESC__CLIENT_CHAR_CONFIGURATION = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
 
 fun BluetoothGatt.setNotifiable(serviceCharacteristic: Pair<String, String>, bleInputProperty: String) {
-  val descriptor = getCharacteristic(serviceCharacteristic).getDescriptor(DESC__CLIENT_CHAR_CONFIGURATION)
-  val (value, enable) = when (bleInputProperty) {
-    "notification" -> BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE to true
-    "indication" -> BluetoothGattDescriptor.ENABLE_INDICATION_VALUE to true
-    else -> BluetoothGattDescriptor.DISABLE_NOTIFICATION_VALUE to false
+  try {
+    Log.v("RYAN/DEBUG", "setNotifiable ${serviceCharacteristic}")
+    val descriptor = getCharacteristic(serviceCharacteristic)?.getDescriptor(DESC__CLIENT_CHAR_CONFIGURATION)
+    if(descriptor == null) {
+      return;
+    }
+    val (value, enable) = when (bleInputProperty) {
+      "notification" -> BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE to true
+      "indication" -> BluetoothGattDescriptor.ENABLE_INDICATION_VALUE to true
+      else -> BluetoothGattDescriptor.DISABLE_NOTIFICATION_VALUE to false
+    }
+    descriptor.value = value
+    setCharacteristicNotification(descriptor.characteristic, enable) && writeDescriptor(descriptor)
+  } catch (e: java.lang.Exception) {
+    Log.v("RYAN/EXCEPTION", "${e}");
   }
-  descriptor.value = value
-  setCharacteristicNotification(descriptor.characteristic, enable) && writeDescriptor(descriptor)
+
 }
